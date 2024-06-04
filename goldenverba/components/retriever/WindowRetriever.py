@@ -3,6 +3,7 @@ from weaviate.gql.get import HybridFusion
 
 from goldenverba.components.chunk import Chunk
 from goldenverba.components.interfaces import Embedder, Retriever
+from goldenverba.server.types import QueryPayload
 
 
 class WindowRetriever(Retriever):
@@ -17,7 +18,7 @@ class WindowRetriever(Retriever):
 
     def retrieve(
         self,
-        queries: list[str],
+        queries: list[QueryPayload],
         client: Client,
         embedder: Embedder,
     ) -> list[Chunk]:
@@ -43,14 +44,19 @@ class WindowRetriever(Retriever):
                         "doc_type",
                     ],
                 )
+                .with_where({
+                    "path": ["doc_type"],
+                    "operator": "Equal",
+                    "valueText": query.doc_label,
+                })
                 .with_additional(properties=["score"])
                 .with_autocut(1)
             )
 
             if needs_vectorization:
-                vector = embedder.vectorize_query(query)
+                vector = embedder.vectorize_query(query.query)
                 query_results = query_results.with_hybrid(
-                    query=query,
+                    query=query.query,
                     vector=vector,
                     fusion_type=HybridFusion.RELATIVE_SCORE,
                     properties=[
@@ -60,7 +66,7 @@ class WindowRetriever(Retriever):
 
             else:
                 query_results = query_results.with_hybrid(
-                    query=query,
+                    query=query.query,
                     fusion_type=HybridFusion.RELATIVE_SCORE,
                     properties=[
                         "text",
