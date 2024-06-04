@@ -4,6 +4,7 @@ from goldenverba.components.types import FileData
 
 class QueryPayload(BaseModel):
     query: str
+    doc_label: str
 
 
 class ConversationItem(BaseModel):

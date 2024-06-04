@@ -284,10 +284,10 @@ async def update_config(payload: ConfigPayload):
 # Receive query and return chunks and query answer
 @app.post("/api/query")
 async def query(payload: QueryPayload):
-    msg.good(f"Received query: {payload.query}")
+    msg.good(f"Received query: {payload.query} {payload.doc_label}")
     start_time = time.time()  # Start timing
     try:
-        chunks, context = manager.retrieve_chunks([payload.query])
+        chunks, context = manager.retrieve_chunks([payload])
 
         retrieved_chunks = [
             {
@@ -302,7 +302,7 @@ async def query(payload: QueryPayload):
         ]
 
         elapsed_time = round(time.time() - start_time, 2)  # Calculate elapsed time
-        msg.good(f"Succesfully processed query: {payload.query} in {elapsed_time}s")
+        msg.good(f"Succesfully processed query: {payload.query} {payload.doc_label} in {elapsed_time}s")
 
         if len(chunks) == 0:
             return JSONResponse(

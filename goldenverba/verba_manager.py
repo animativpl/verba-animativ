@@ -27,6 +27,7 @@ from goldenverba.components.managers import (
     RetrieverManager,
     GeneratorManager,
 )
+from goldenverba.server.types import QueryPayload
 
 load_dotenv()
 
@@ -490,7 +491,7 @@ class VerbaManager:
 
         msg.info("Added query to suggestions")
 
-    def retrieve_chunks(self, queries: list[str]) -> list[Chunk]:
+    def retrieve_chunks(self, queries: list[QueryPayload]) -> list[Chunk]:
         chunks, context = self.retriever_manager.retrieve(
             queries,
             self.client,
