@@ -34,6 +34,7 @@ from goldenverba.components.generation.OllamaGenerator import OllamaGenerator
 
 import time
 
+from goldenverba.server.types import QueryPayload
 
 try:
     import tiktoken
@@ -230,7 +231,7 @@ class RetrieverManager:
 
     def retrieve(
         self,
-        queries: list[str],
+        queries: list[QueryPayload],
         client: Client,
         embedder: Embedder,
         generator: Generator,

@@ -10,6 +10,8 @@ from tqdm import tqdm
 from wasabi import msg
 from weaviate import Client
 
+from goldenverba.server.types import QueryPayload
+
 try:
     import tiktoken
 except Exception:
@@ -538,7 +540,7 @@ class Retriever(VerbaComponent):
 
     def retrieve(
         self,
-        queries: list[str],
+        queries: list[QueryPayload],
         client: Client,
         embedder: Embedder,
     ) -> tuple[list[Chunk], str]:
