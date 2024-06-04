@@ -164,6 +164,25 @@ async def retrieve_config():
             },
         )
 
+
+@app.get("/api/document_types")
+async def get_document_types():
+    try:
+        doc_types = manager.retrieve_all_document_types()
+        return JSONResponse(
+            content={
+                "doc_types": list(doc_types)
+            }
+        )
+    except Exception as e:
+        msg.fail(f"All document types retrieval failed: {str(e)}")
+        return JSONResponse(
+            content={
+                "doc_types": [],
+            }
+        )
+
+
 ### WEBSOCKETS
 
 @app.websocket("/ws/generate_stream")
