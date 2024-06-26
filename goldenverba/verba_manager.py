@@ -44,7 +44,7 @@ class VerbaManager:
         self.installed_libraries = {}
         self.weaviate_type = ""
         self.client = self.setup_client()
-        self.enable_caching = True
+        self.enable_caching = False
 
         self.verify_installed_libraries()
         self.verify_variables()
