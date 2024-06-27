@@ -193,7 +193,6 @@ async def get_document_types():
 @ws_router.websocket("/ws/generate_stream")
 async def websocket_generate_stream(websocket: WebSocket):
     await websocket.accept()
-
     header_key = websocket.headers.get("X-API-Key", "")
     api_key = os.environ.get("X_API_KEY", "")
 
