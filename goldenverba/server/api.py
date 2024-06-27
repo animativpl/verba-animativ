@@ -1,8 +1,7 @@
-from fastapi import FastAPI, WebSocket, status, Security, HTTPException, Depends
+from fastapi import FastAPI, WebSocket, status, Depends, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.security import APIKeyHeader
 
 import os
 from pathlib import Path
@@ -13,6 +12,7 @@ from wasabi import msg  # type: ignore[import]
 import time
 
 from goldenverba import verba_manager
+from goldenverba.server.auth import check_api_key
 from goldenverba.server.types import (
     ResetPayload,
     ConfigPayload,
@@ -39,15 +39,9 @@ manager = verba_manager.VerbaManager()
 setup_managers(manager)
 
 # FastAPI App
-api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
-
-
-def check_api_key(api_key_header: str = Security(api_key_header)):
-    if api_key_header != "test":
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API Key")
-
-
-app = FastAPI(dependencies=[Depends(check_api_key)])
+app = FastAPI()
+http_router = APIRouter(dependencies=[Depends(check_api_key)])
+ws_router = APIRouter()
 
 origins = [
     "http://localhost:3000",
@@ -77,15 +71,15 @@ app.mount(
 app.mount("/static", StaticFiles(directory=BASE_DIR / "frontend/out"), name="app")
 
 
-@app.get("/")
-@app.head("/")
+@http_router.get("/")
+@http_router.head("/")
 async def serve_frontend():
     return FileResponse(os.path.join(BASE_DIR, "frontend/out/index.html"))
 
 
 ### GET
 # Define health check endpoint
-@app.get("/api/health")
+@http_router.get("/api/health")
 async def health_check():
     try:
         if manager.client.is_ready():
@@ -114,7 +108,7 @@ async def health_check():
 
 
 # Get Status meta data
-@app.get("/api/get_status")
+@http_router.get("/api/get_status")
 async def get_status():
     try:
         schemas = manager.get_schemas()
@@ -158,7 +152,7 @@ async def get_status():
 
 
 # Get Configuration
-@app.get("/api/config")
+@http_router.get("/api/config")
 async def retrieve_config():
     try:
         config = get_config(manager)
@@ -176,7 +170,7 @@ async def retrieve_config():
         )
 
 
-@app.get("/api/document_types")
+@http_router.get("/api/document_types")
 async def get_document_types():
     try:
         doc_types = manager.retrieve_all_document_types()
@@ -196,41 +190,50 @@ async def get_document_types():
 
 ### WEBSOCKETS
 
-@app.websocket("/ws/generate_stream")
+@ws_router.websocket("/ws/generate_stream")
 async def websocket_generate_stream(websocket: WebSocket):
     await websocket.accept()
-    while True:  # Start a loop to keep the connection alive.
-        try:
-            data = await websocket.receive_text()
-            # Parse and validate the JSON string using Pydantic model
-            msg.info(data)
-            payload = GeneratePayload.model_validate_json(data)
-            msg.good(f"Received generate stream call for {payload.query}")
-            full_text = ""
-            async for chunk in manager.generate_stream_answer(
-                    [payload.query], [payload.context], payload.conversation
-            ):
-                full_text += chunk["message"]
-                if chunk["finish_reason"] == "stop":
-                    chunk["full_text"] = full_text
-                await websocket.send_json(chunk)
 
-        except WebSocketDisconnect:
-            msg.warn("WebSocket connection closed by client.")
-            break  # Break out of the loop when the client disconnects
+    header_key = websocket.headers.get("X-API-Key", "")
+    api_key = os.environ.get("X_API_KEY", "")
 
-        except Exception as e:
-            msg.fail(f"WebSocket Error: {str(e)}")
-            await websocket.send_json(
-                {"message": e, "finish_reason": "stop", "full_text": str(e)}
-            )
-        msg.good("Succesfully streamed answer")
+    if api_key != "" and header_key != api_key:
+        msg.warn("WS Invalid API Key")
+        await websocket.send_json({"detail": "Invalid API Key"})
+        await websocket.close()
+    else:
+        while True:  # Start a loop to keep the connection alive.
+            try:
+                data = await websocket.receive_text()
+                # Parse and validate the JSON string using Pydantic model
+                msg.info(data)
+                payload = GeneratePayload.model_validate_json(data)
+                msg.good(f"Received generate stream call for {payload.query}")
+                full_text = ""
+                async for chunk in manager.generate_stream_answer(
+                        [payload.query], [payload.context], payload.conversation
+                ):
+                    full_text += chunk["message"]
+                    if chunk["finish_reason"] == "stop":
+                        chunk["full_text"] = full_text
+                    await websocket.send_json(chunk)
+
+            except WebSocketDisconnect:
+                msg.warn("WebSocket connection closed by client.")
+                break  # Break out of the loop when the client disconnects
+
+            except Exception as e:
+                msg.fail(f"WebSocket Error: {str(e)}")
+                await websocket.send_json(
+                    {"message": e, "finish_reason": "stop", "full_text": str(e)}
+                )
+            msg.good("Succesfully streamed answer")
 
 
 ### POST
 
 # Reset Verba
-@app.post("/api/reset")
+@http_router.post("/api/reset")
 async def reset_verba(payload: ResetPayload):
     if production:
         return JSONResponse(status_code=200, content={})
@@ -256,7 +259,7 @@ async def reset_verba(payload: ResetPayload):
 
 
 # Receive query and return chunks and query answer
-@app.post("/api/import")
+@http_router.post("/api/import")
 async def import_data(payload: ImportPayload):
     logging = []
 
@@ -291,7 +294,7 @@ async def import_data(payload: ImportPayload):
         )
 
 
-@app.post("/api/set_config")
+@http_router.post("/api/set_config")
 async def update_config(payload: ConfigPayload):
     if production:
         return JSONResponse(
@@ -315,7 +318,7 @@ async def update_config(payload: ConfigPayload):
 
 
 # Receive query and return chunks and query answer
-@app.post("/api/query")
+@http_router.post("/api/query")
 async def query(payload: QueryPayload):
     msg.good(f"Received query: {payload.query} {payload.doc_label}")
     start_time = time.time()  # Start timing
@@ -369,7 +372,7 @@ async def query(payload: QueryPayload):
 
 
 # Retrieve auto complete suggestions based on user input
-@app.post("/api/suggestions")
+@http_router.post("/api/suggestions")
 async def suggestions(payload: QueryPayload):
     try:
         suggestions = manager.get_suggestions(payload.query)
@@ -388,7 +391,7 @@ async def suggestions(payload: QueryPayload):
 
 
 # Retrieve specific document based on UUID
-@app.post("/api/get_document")
+@http_router.post("/api/get_document")
 async def get_document(payload: GetDocumentPayload):
     # TODO Standarize Document Creation
     msg.info(f"Document ID received: {payload.document_id}")
@@ -425,7 +428,7 @@ async def get_document(payload: GetDocumentPayload):
 
 
 ## Retrieve and search documents imported to Weaviate
-@app.post("/api/get_all_documents")
+@http_router.post("/api/get_all_documents")
 async def get_all_documents(payload: SearchQueryPayload):
     # TODO Standarize Document Creation
     msg.info("Get all documents request received")
@@ -499,7 +502,7 @@ async def get_all_documents(payload: SearchQueryPayload):
 
 
 # Delete specific document based on UUID
-@app.post("/api/delete_document")
+@http_router.post("/api/delete_document")
 async def delete_document(payload: GetDocumentPayload):
     if production:
         msg.warn("Can't delete documents when in Production Mode")
@@ -509,3 +512,6 @@ async def delete_document(payload: GetDocumentPayload):
 
     manager.delete_document_by_id(payload.document_id)
     return JSONResponse(content={})
+
+app.include_router(http_router)
+app.include_router(ws_router)
