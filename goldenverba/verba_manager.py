@@ -643,6 +643,7 @@ class VerbaManager:
     ):
 
         semantic_result = None
+        self.enable_caching = False
 
         if self.enable_caching:
             semantic_query = self.embedder_manager.embedders[
