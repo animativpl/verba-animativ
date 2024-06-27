@@ -315,24 +315,41 @@ async def import_data(payload: ImportPayload):
 
 @http_guarded_router.post("/api/import-files")
 async def import_files(payload: ImportPayload):
-    logging = []
+    response = []
 
     try:
-        documents, logging = manager.import_data(
-            payload.data, payload.textValues, logging
+        documents, _ = manager.import_data(
+            payload.data, payload.textValues, []
         )
+
+        for document in documents:
+            saved_docs = manager.retrieve_all_documents()
+            saved_docs = list(map(lambda doc: manager.retrieve_document(doc["_additional"]["id"]), saved_docs))
+            for saved in saved_docs:
+                document_properties = saved.get("properties", {})
+                obj = {
+                    "class": saved.get("class", "No Class"),
+                    "id": saved.get("id", "No Id"),
+                    "chunks": document_properties.get("chunk_count", 0),
+                    "link": document_properties.get("doc_link", ""),
+                    "name": document_properties.get("doc_name", "No name"),
+                    "type": document_properties.get("doc_type", "No type"),
+                    "text": document_properties.get("text", "No text"),
+                    "timestamp": document_properties.get("timestamp", ""),
+                }
+                if obj["name"] == document.name and obj["type"] == document.type and obj["text"] == document.text:
+                    response.append(obj)
 
         return JSONResponse(
             content={
-                "logging": logging,
+                "documents": response,
             }
         )
 
-    except Exception as e:
-        logging.append({"type": "ERROR", "message": str(e)})
+    except Exception as _:
         return JSONResponse(
             content={
-                "logging": logging,
+                "documents": response,
             }
         )
 
