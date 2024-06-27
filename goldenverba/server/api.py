@@ -58,23 +58,24 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-BASE_DIR = Path(__file__).resolve().parent
+if os.environ.get("ENABLE_FRONTEND", "false") != "false":
+    BASE_DIR = Path(__file__).resolve().parent
 
-# Serve the assets (JS, CSS, images, etc.)
-app.mount(
-    "/static/_next",
-    StaticFiles(directory=BASE_DIR / "frontend/out/_next"),
-    name="next-assets",
-)
+    # Serve the assets (JS, CSS, images, etc.)
+    app.mount(
+        "/static/_next",
+        StaticFiles(directory=BASE_DIR / "frontend/out/_next"),
+        name="next-assets",
+    )
 
-# Serve the main page and other static files
-app.mount("/static", StaticFiles(directory=BASE_DIR / "frontend/out"), name="app")
+    # Serve the main page and other static files
+    app.mount("/static", StaticFiles(directory=BASE_DIR / "frontend/out"), name="app")
 
 
-@http_router.get("/")
-@http_router.head("/")
-async def serve_frontend():
-    return FileResponse(os.path.join(BASE_DIR, "frontend/out/index.html"))
+    @http_router.get("/")
+    @http_router.head("/")
+    async def serve_frontend():
+        return FileResponse(os.path.join(BASE_DIR, "frontend/out/index.html"))
 
 
 ### GET
