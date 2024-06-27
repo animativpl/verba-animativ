@@ -1,3 +1,5 @@
+from typing import Optional
+
 from pydantic import BaseModel
 from goldenverba.components.types import FileData
 
@@ -20,9 +22,9 @@ class GeneratePayload(BaseModel):
 
 class SearchQueryPayload(BaseModel):
     query: str
-    doc_type: str
-    page: int
-    pageSize: int
+    doc_type: Optional[str] = None
+    page: Optional[int] = None
+    pageSize: Optional[int] = None
 
 
 class GetDocumentPayload(BaseModel):
@@ -48,7 +50,7 @@ class LoadPayload(BaseModel):
 class ImportPayload(BaseModel):
     data: list[FileData]
     textValues: list[str]
-    config: dict
+    config: Optional[dict] = None
 
 
 class ConfigPayload(BaseModel):

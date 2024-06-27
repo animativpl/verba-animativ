@@ -110,7 +110,7 @@ async def health_check():
 
 
 # Get Status meta data
-@http_guarded_router.get("/api/get_status")
+@http_guarded_router.get("/api/get_status", include_in_schema=False)
 async def get_status():
     try:
         schemas = manager.get_schemas()
@@ -154,7 +154,7 @@ async def get_status():
 
 
 # Get Configuration
-@http_guarded_router.get("/api/config")
+@http_guarded_router.get("/api/config", include_in_schema=False)
 async def retrieve_config():
     try:
         config = get_config(manager)
@@ -172,7 +172,7 @@ async def retrieve_config():
         )
 
 
-@http_guarded_router.get("/api/document_types")
+@http_guarded_router.get("/api/document-types")
 async def get_document_types():
     try:
         doc_types = manager.retrieve_all_document_types()
@@ -186,6 +186,24 @@ async def get_document_types():
         return JSONResponse(
             content={
                 "doc_types": [],
+            }
+        )
+
+
+@http_guarded_router.get("/api/documents")
+async def get_all_documents():
+    try:
+        docs = manager.retrieve_all_documents()
+        return JSONResponse(
+            content={
+                "documents": list(docs)
+            }
+        )
+    except Exception as e:
+        msg.fail(f"All document types retrieval failed: {str(e)}")
+        return JSONResponse(
+            content={
+                "documents": [],
             }
         )
 
@@ -234,7 +252,7 @@ async def websocket_generate_stream(websocket: WebSocket):
 ### POST
 
 # Reset Verba
-@http_guarded_router.post("/api/reset")
+@http_guarded_router.post("/api/reset", include_in_schema=False)
 async def reset_verba(payload: ResetPayload):
     if production:
         return JSONResponse(status_code=200, content={})
@@ -260,7 +278,7 @@ async def reset_verba(payload: ResetPayload):
 
 
 # Receive query and return chunks and query answer
-@http_guarded_router.post("/api/import")
+@http_guarded_router.post("/api/import", include_in_schema=False)
 async def import_data(payload: ImportPayload):
     logging = []
 
@@ -295,7 +313,31 @@ async def import_data(payload: ImportPayload):
         )
 
 
-@http_guarded_router.post("/api/set_config")
+@http_guarded_router.post("/api/import-files")
+async def import_files(payload: ImportPayload):
+    logging = []
+
+    try:
+        documents, logging = manager.import_data(
+            payload.data, payload.textValues, logging
+        )
+
+        return JSONResponse(
+            content={
+                "logging": logging,
+            }
+        )
+
+    except Exception as e:
+        logging.append({"type": "ERROR", "message": str(e)})
+        return JSONResponse(
+            content={
+                "logging": logging,
+            }
+        )
+
+
+@http_guarded_router.post("/api/set_config", include_in_schema=False)
 async def update_config(payload: ConfigPayload):
     if production:
         return JSONResponse(
@@ -373,7 +415,7 @@ async def query(payload: QueryPayload):
 
 
 # Retrieve auto complete suggestions based on user input
-@http_guarded_router.post("/api/suggestions")
+@http_guarded_router.post("/api/suggestions", include_in_schema=False)
 async def suggestions(payload: QueryPayload):
     try:
         suggestions = manager.get_suggestions(payload.query)
@@ -392,7 +434,7 @@ async def suggestions(payload: QueryPayload):
 
 
 # Retrieve specific document based on UUID
-@http_guarded_router.post("/api/get_document")
+@http_guarded_router.get("/api/document")
 async def get_document(payload: GetDocumentPayload):
     # TODO Standarize Document Creation
     msg.info(f"Document ID received: {payload.document_id}")
@@ -429,7 +471,7 @@ async def get_document(payload: GetDocumentPayload):
 
 
 ## Retrieve and search documents imported to Weaviate
-@http_guarded_router.post("/api/get_all_documents")
+@http_guarded_router.post("/api/get_all_documents", include_in_schema=False)
 async def get_all_documents(payload: SearchQueryPayload):
     # TODO Standarize Document Creation
     msg.info("Get all documents request received")
@@ -503,7 +545,7 @@ async def get_all_documents(payload: SearchQueryPayload):
 
 
 # Delete specific document based on UUID
-@http_guarded_router.post("/api/delete_document")
+@http_guarded_router.delete("/api/document")
 async def delete_document(payload: GetDocumentPayload):
     if production:
         msg.warn("Can't delete documents when in Production Mode")

@@ -502,7 +502,7 @@ class VerbaManager:
         )
         return chunks, context
 
-    def retrieve_all_documents(self, doc_type: str, page: int, pageSize: int) -> list:
+    def retrieve_all_documents(self, doc_type: str = None, page: int = None, pageSize: int = None) -> list:
         """Return all documents from Weaviate
         @returns list - Document list.
         """
@@ -512,53 +512,96 @@ class VerbaManager:
             ].vectorizer
         )
 
-        offset = pageSize * (page - 1)
-
-        if doc_type == "":
-            query_results = (
-                self.client.query.get(
-                    class_name=class_name,
-                    properties=["doc_name", "doc_type", "doc_link"],
+        if doc_type is None:
+            if pageSize is None and page is None:
+                query_results = (
+                    self.client.query.get(
+                        class_name=class_name,
+                        properties=["doc_name", "doc_type", "doc_link"],
+                    )
+                    .with_additional(properties=["id"])
+                    .with_sort(
+                        [
+                            {
+                                "path": ["doc_name"],
+                                "order": "asc",
+                            }
+                        ]
+                    )
+                    .do()
                 )
-                .with_additional(properties=["id"])
-                .with_limit(pageSize)
-                .with_offset(offset)
-                .with_sort(
-                    [
-                        {
-                            "path": ["doc_name"],
-                            "order": "asc",
-                        }
-                    ]
+            else:
+                offset = pageSize * (page - 1)
+                query_results = (
+                    self.client.query.get(
+                        class_name=class_name,
+                        properties=["doc_name", "doc_type", "doc_link"],
+                    )
+                    .with_additional(properties=["id"])
+                    .with_limit(pageSize)
+                    .with_offset(offset)
+                    .with_sort(
+                        [
+                            {
+                                "path": ["doc_name"],
+                                "order": "asc",
+                            }
+                        ]
+                    )
+                    .do()
                 )
-                .do()
-            )
         else:
-            query_results = (
-                self.client.query.get(
-                    class_name=class_name,
-                    properties=["doc_name", "doc_type", "doc_link"],
-                )
-                .with_additional(properties=["id"])
-                .with_where(
-                    {
-                        "path": ["doc_type"],
-                        "operator": "Equal",
-                        "valueText": doc_type,
-                    }
-                )
-                .with_limit(pageSize)
-                .with_offset(offset)
-                .with_sort(
-                    [
+            if pageSize is None and page is None:
+                query_results = (
+                    self.client.query.get(
+                        class_name=class_name,
+                        properties=["doc_name", "doc_type", "doc_link"],
+                    )
+                    .with_additional(properties=["id"])
+                    .with_where(
                         {
-                            "path": ["doc_name"],
-                            "order": "asc",
+                            "path": ["doc_type"],
+                            "operator": "Equal",
+                            "valueText": doc_type,
                         }
-                    ]
+                    )
+                    .with_sort(
+                        [
+                            {
+                                "path": ["doc_name"],
+                                "order": "asc",
+                            }
+                        ]
+                    )
+                    .do()
                 )
-                .do()
-            )
+            else:
+                offset = pageSize * (page - 1)
+                query_results = (
+                    self.client.query.get(
+                        class_name=class_name,
+                        properties=["doc_name", "doc_type", "doc_link"],
+                    )
+                    .with_additional(properties=["id"])
+                    .with_where(
+                        {
+                            "path": ["doc_type"],
+                            "operator": "Equal",
+                            "valueText": doc_type,
+                        }
+                    )
+                    .with_limit(pageSize)
+                    .with_offset(offset)
+                    .with_sort(
+                        [
+                            {
+                                "path": ["doc_name"],
+                                "order": "asc",
+                            }
+                        ]
+                    )
+                    .do()
+                )
 
         results = query_results["data"]["Get"][class_name]
         return results
@@ -643,7 +686,6 @@ class VerbaManager:
     ):
 
         semantic_result = None
-        self.enable_caching = False
 
         if self.enable_caching:
             semantic_query = self.embedder_manager.embedders[

@@ -38,13 +38,15 @@ class BasicReader(Reader):
 
             decoded_bytes = base64.b64decode(file.content)
 
+            doctype = file.doctype if file.doctype is not None else self.config["document_type"].text
+
             if file.extension in ["txt", "md", "mdx"]:
                 try:
                     original_text = decoded_bytes.decode("utf-8")
                     document = Document(
                         name=file.filename,
                         text=original_text,
-                        type=self.config["document_type"].text,
+                        type=doctype,
                         timestamp=str(datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
                         reader=self.name,
                     )
@@ -89,7 +91,7 @@ class BasicReader(Reader):
                     document = Document(
                         name=file.filename,
                         text=full_text,
-                        type=self.config["document_type"].text,
+                        type=doctype,
                         timestamp=str(datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
                         reader=self.name,
                     )

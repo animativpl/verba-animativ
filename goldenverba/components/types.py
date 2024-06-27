@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Literal
+from typing import Literal, Optional
 
 
 class InputText(BaseModel):
@@ -18,3 +18,4 @@ class FileData(BaseModel):
     filename: str
     extension: str
     content: str
+    doctype: Optional[str] = None

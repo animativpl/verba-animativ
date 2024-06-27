@@ -1,7 +1,6 @@
 from goldenverba.verba_manager import VerbaManager
 
 import json
-import os
 
 from wasabi import msg  # type: ignore[import]
 
@@ -115,7 +114,7 @@ def set_config(manager: VerbaManager, combined_config: dict):
         .get("Chat", {})
         .get("settings", {})
         .get("caching", {})
-        .get("checked", True)
+        .get("checked", False)
     )
     if manager.enable_caching != enable_caching:
         msg.info(f"Changing Caching from {manager.enable_caching} to {enable_caching} ")
