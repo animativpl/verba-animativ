@@ -116,6 +116,7 @@ def set_config(manager: VerbaManager, combined_config: dict):
         .get("caching", {})
         .get("checked", False)
     )
+    enable_caching = False
     if manager.enable_caching != enable_caching:
         msg.info(f"Changing Caching from {manager.enable_caching} to {enable_caching} ")
         manager.enable_caching = enable_caching
