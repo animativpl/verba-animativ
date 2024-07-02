@@ -20,9 +20,13 @@ if __name__ == "__main__":
     uri = "uri"
     headers = [("X-API-Key", "<KEY>")]
     data = {
-        "query": "Co sie znajduje w tym dokumencie?",
+        "query": "Co sie znajduje w tym dokumencie oraz ile mam lat?",
         "context": "--- Document file1.txt ---\n\nChunk 0\n\nhahaha\n\n--- Document file2.txt ---\n\nChunk 0\n\nhahaha\n\n",
-        "conversation": []
+        "conversation":
+            [
+                {"type": "system", "content": "Witaj!"},
+                {"type": "user", "content": "Mam 44 lata."},
+            ]
     }
 
     asyncio.get_event_loop().run_until_complete(send_json(uri, data, headers))
