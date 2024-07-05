@@ -823,6 +823,11 @@ class VerbaManager:
             self.embedder_manager.selected_embedder
         ].remove_document_by_id(self.client, doc_id)
 
+    def delete_document_by_name(self, doc_name: str) -> None:
+        self.embedder_manager.embedders[
+            self.embedder_manager.selected_embedder
+        ].remove_document_by_name(self.client, doc_name)
+
     def search_documents(
         self, query: str, doc_type: str, page: int, pageSize: int
     ) -> list:

@@ -573,6 +573,20 @@ async def delete_document(payload: GetDocumentPayload):
     manager.delete_document_by_id(payload.document_id)
     return JSONResponse(content={})
 
+
+# Delete specific document based on UUID
+@http_guarded_router.delete("/api/document-name")
+async def delete_document_by_name(payload: GetDocumentPayload):
+    if production:
+        msg.warn("Can't delete documents when in Production Mode")
+        return JSONResponse(status_code=200, content={})
+
+    msg.info(f"Document Name received: {payload.document_id}")
+
+    manager.delete_document_by_name(payload.document_id)
+    return JSONResponse(content={})
+
+
 app.include_router(http_guarded_router)
 app.include_router(http_unguarded_router)
 app.include_router(ws_router)

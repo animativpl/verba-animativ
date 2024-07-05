@@ -348,6 +348,22 @@ class Embedder(VerbaComponent):
 
         msg.warn(f"Deleted document {doc_id} and its chunks")
 
+    def remove_document_by_name(self, client: Client, doc_name: str):
+        doc_class_name = "VERBA_Document_" + strip_non_letters(self.vectorizer)
+        chunk_class_name = "VERBA_Chunk_" + strip_non_letters(self.vectorizer)
+
+        client.data_object.delete(
+            class_name=doc_class_name,
+            where={"path": ["doc_name"], "operator": "Equal", "valueText": doc_name}
+        )
+
+        client.batch.delete_objects(
+            class_name=chunk_class_name,
+            where={"path": ["doc_name"], "operator": "Equal", "valueText": doc_name},
+        )
+
+        msg.warn(f"Deleted document {doc_name} and its chunks")
+
     def get_document_class(self) -> str:
         return "VERBA_Document_" + strip_non_letters(self.vectorizer)
 
