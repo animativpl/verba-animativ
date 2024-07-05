@@ -370,10 +370,12 @@ class Embedder(VerbaComponent):
 
         client.batch.delete_objects(
             class_name=doc_class_name,
+            where={"path": ["doc_name"], "operator": "Equal", "valueText": "*"},
         )
 
         client.batch.delete_objects(
             class_name=chunk_class_name,
+            where={"path": ["doc_name"], "operator": "Equal", "valueText": "*"},
         )
 
         msg.warn("Deleted all documents and its chunks")
