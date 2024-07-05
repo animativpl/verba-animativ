@@ -352,7 +352,7 @@ class Embedder(VerbaComponent):
         doc_class_name = "VERBA_Document_" + strip_non_letters(self.vectorizer)
         chunk_class_name = "VERBA_Chunk_" + strip_non_letters(self.vectorizer)
 
-        client.data_object.delete(
+        client.batch.delete_objects(
             class_name=doc_class_name,
             where={"path": ["doc_name"], "operator": "Equal", "valueText": doc_name}
         )
