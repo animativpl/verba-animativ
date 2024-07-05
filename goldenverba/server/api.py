@@ -587,6 +587,16 @@ async def delete_document_by_name(payload: GetDocumentPayload):
     return JSONResponse(content={})
 
 
+@http_guarded_router.delete("/api/documents")
+async def delete_all_documents():
+    if production:
+        msg.warn("Can't delete documents when in Production Mode")
+        return JSONResponse(status_code=200, content={})
+
+    manager.delete_documents()
+    return JSONResponse(content={})
+
+
 app.include_router(http_guarded_router)
 app.include_router(http_unguarded_router)
 app.include_router(ws_router)

@@ -364,6 +364,20 @@ class Embedder(VerbaComponent):
 
         msg.warn(f"Deleted document {doc_name} and its chunks")
 
+    def remove_documents(self, client: Client):
+        doc_class_name = "VERBA_Document_" + strip_non_letters(self.vectorizer)
+        chunk_class_name = "VERBA_Chunk_" + strip_non_letters(self.vectorizer)
+
+        client.batch.delete_objects(
+            class_name=doc_class_name,
+        )
+
+        client.batch.delete_objects(
+            class_name=chunk_class_name,
+        )
+
+        msg.warn("Deleted all documents and its chunks")
+
     def get_document_class(self) -> str:
         return "VERBA_Document_" + strip_non_letters(self.vectorizer)
 

@@ -31,6 +31,7 @@ from goldenverba.server.types import QueryPayload
 
 load_dotenv()
 
+
 class VerbaManager:
     """Manages all Verba Components."""
 
@@ -57,7 +58,7 @@ class VerbaManager:
             schema_manager.init_schemas(self.client, embedding, False, True)
 
     def import_data(
-        self, fileData: list[FileData], textValues: list[str], logging: list[dict]
+            self, fileData: list[FileData], textValues: list[str], logging: list[dict]
     ) -> list[Document]:
 
         loaded_documents, logging = self.reader_manager.load(
@@ -386,10 +387,10 @@ class VerbaManager:
 
         if os.environ.get("OPENAI_API_TYPE", "") == "azure":
             if not (
-                self.environment_variables["OPENAI_BASE_URL"]
-                and self.environment_variables["AZURE_OPENAI_RESOURCE_NAME"]
-                and self.environment_variables["AZURE_OPENAI_EMBEDDING_MODEL"]
-                and self.environment_variables["OPENAI_MODEL"]
+                    self.environment_variables["OPENAI_BASE_URL"]
+                    and self.environment_variables["AZURE_OPENAI_RESOURCE_NAME"]
+                    and self.environment_variables["AZURE_OPENAI_EMBEDDING_MODEL"]
+                    and self.environment_variables["OPENAI_MODEL"]
             ):
                 raise EnvironmentError(
                     "Missing environment variables. When using Azure OpenAI, you need to set OPENAI_BASE_URL, AZURE_OPENAI_RESOURCE_NAME, AZURE_OPENAI_EMBEDDING_MODEL and OPENAI_MODEL. Please check documentation."
@@ -417,7 +418,8 @@ class VerbaManager:
                         .get("count", 0)
                     )
         except Exception as e:
-            msg.error(f"Couldn't retrieve information about Collections, if you're using Weaviate Embedded, try to reset `~/.local/share/weaviate` ({str(e)})")
+            msg.error(
+                f"Couldn't retrieve information about Collections, if you're using Weaviate Embedded, try to reset `~/.local/share/weaviate` ({str(e)})")
 
         return schemas
 
@@ -473,12 +475,12 @@ class VerbaManager:
         )
 
         if (
-            "data" in check_results
-            and len(check_results["data"]["Get"]["VERBA_Suggestion"]) > 0
+                "data" in check_results
+                and len(check_results["data"]["Get"]["VERBA_Suggestion"]) > 0
         ):
             if (
-                query
-                == check_results["data"]["Get"]["VERBA_Suggestion"][0]["suggestion"]
+                    query
+                    == check_results["data"]["Get"]["VERBA_Suggestion"][0]["suggestion"]
             ):
                 return
 
@@ -648,7 +650,7 @@ class VerbaManager:
         return document
 
     async def generate_answer(
-        self, queries: list[str], contexts: list[str], conversation: dict
+            self, queries: list[str], contexts: list[str], conversation: dict
     ):
         semantic_result = None
         if self.enable_caching:
@@ -682,7 +684,7 @@ class VerbaManager:
             return full_text
 
     async def generate_stream_answer(
-        self, queries: list[str], contexts: list[str], conversation: dict
+            self, queries: list[str], contexts: list[str], conversation: dict
     ):
 
         semantic_result = None
@@ -828,8 +830,13 @@ class VerbaManager:
             self.embedder_manager.selected_embedder
         ].remove_document_by_name(self.client, doc_name)
 
+    def delete_documents(self) -> None:
+        self.embedder_manager.embedders[
+            self.embedder_manager.selected_embedder
+        ].remove_documents(self.client)
+
     def search_documents(
-        self, query: str, doc_type: str, page: int, pageSize: int
+            self, query: str, doc_type: str, page: int, pageSize: int
     ) -> list:
         return self.embedder_manager.embedders[
             self.embedder_manager.selected_embedder
