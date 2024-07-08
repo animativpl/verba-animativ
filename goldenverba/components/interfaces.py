@@ -1,3 +1,5 @@
+from typing import List
+
 from goldenverba.components.document import Document
 from goldenverba.components.chunk import Chunk
 from goldenverba.components.types import InputText, FileData, InputNumber
@@ -364,18 +366,18 @@ class Embedder(VerbaComponent):
 
         msg.warn(f"Deleted document {doc_name} and its chunks")
 
-    def remove_documents(self, client: Client):
+    def remove_documents(self, client: Client, uuids: List[str]):
         doc_class_name = "VERBA_Document_" + strip_non_letters(self.vectorizer)
         chunk_class_name = "VERBA_Chunk_" + strip_non_letters(self.vectorizer)
 
         client.batch.delete_objects(
             class_name=doc_class_name,
-            where={"path": ["doc_name"], "operator": "Equal", "valueText": "*"},
+            where={"path": ["doc_uuid"], "operator": "Equal", "valueText": uuids},
         )
 
         client.batch.delete_objects(
             class_name=chunk_class_name,
-            where={"path": ["doc_name"], "operator": "Equal", "valueText": "*"},
+            where={"path": ["doc_uuid"], "operator": "Equal", "valueText": uuids},
         )
 
         msg.warn("Deleted all documents and its chunks")
