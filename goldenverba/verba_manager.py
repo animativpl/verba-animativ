@@ -831,11 +831,9 @@ class VerbaManager:
         ].remove_document_by_name(self.client, doc_name)
 
     def delete_documents(self) -> None:
-        uuids = list(map(lambda x: x["_additional"]["id"], self.retrieve_all_documents()))
-
         self.embedder_manager.embedders[
             self.embedder_manager.selected_embedder
-        ].remove_documents(self.client, uuids)
+        ].remove_documents(self.client)
 
     def search_documents(
             self, query: str, doc_type: str, page: int, pageSize: int
