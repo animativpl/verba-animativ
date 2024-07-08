@@ -81,7 +81,7 @@ if os.environ.get("ENABLE_FRONTEND", "false") != "false":
 
 ### GET
 # Define health check endpoint
-@http_unguarded_router.get("/api/health")
+@http_unguarded_router.head("/api/health")
 async def health_check():
     try:
         if manager.client.is_ready():
