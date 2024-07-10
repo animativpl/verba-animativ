@@ -14,19 +14,15 @@ import time
 from goldenverba import verba_manager
 from goldenverba.server.auth import check_api_key
 from goldenverba.server.types import (
-    ResetPayload,
-    ConfigPayload,
     QueryPayload,
     GeneratePayload,
     GetDocumentPayload,
-    SearchQueryPayload,
-    ImportPayload,
+    ImportPayload, DeleteDocumentPayload, DeleteDocumentNamePayload,
 )
-from goldenverba.server.util import get_config, set_config, setup_managers
+from goldenverba.server.util import setup_managers
 
 load_dotenv()
 
-# Check if runs in production
 production_key = os.environ.get("VERBA_PRODUCTION", "")
 tag = os.environ.get("VERBA_GOOGLE_TAG", "")
 if production_key == "True":
@@ -79,8 +75,9 @@ if os.environ.get("ENABLE_FRONTEND", "false") != "false":
         return FileResponse(os.path.join(BASE_DIR, "frontend/out/index.html"))
 
 
-### GET
-# Define health check endpoint
+# HEAD
+
+# Health check endpoint
 @http_unguarded_router.head("/api/health")
 async def health_check():
     try:
@@ -109,87 +106,9 @@ async def health_check():
         )
 
 
-# Get Status meta data
-@http_guarded_router.get("/api/get_status", include_in_schema=False)
-async def get_status():
-    try:
-        schemas = manager.get_schemas()
-        sorted_schemas = dict(
-            sorted(schemas.items(), key=lambda item: item[1], reverse=True)
-        )
+# GET
 
-        sorted_libraries = dict(
-            sorted(
-                manager.installed_libraries.items(),
-                key=lambda item: (not item[1], item[0]),
-            )
-        )
-        sorted_variables = dict(
-            sorted(
-                manager.environment_variables.items(),
-                key=lambda item: (not item[1], item[0]),
-            )
-        )
-
-        data = {
-            "type": manager.weaviate_type,
-            "libraries": sorted_libraries,
-            "variables": sorted_variables,
-            "schemas": sorted_schemas,
-            "error": "",
-        }
-
-        msg.info("Status Retrieved")
-        return JSONResponse(content=data)
-    except Exception as e:
-        data = {
-            "type": "",
-            "libraries": {},
-            "variables": {},
-            "schemas": {},
-            "error": f"Status retrieval failed: {str(e)}",
-        }
-        msg.fail(f"Status retrieval failed: {str(e)}")
-        return JSONResponse(content=data)
-
-
-# Get Configuration
-@http_guarded_router.get("/api/config", include_in_schema=False)
-async def retrieve_config():
-    try:
-        config = get_config(manager)
-        msg.info("Config Retrieved")
-        return JSONResponse(status_code=200, content={"data": config, "error": ""})
-
-    except Exception as e:
-        msg.warn(f"Could not retrieve configuration: {str(e)}")
-        return JSONResponse(
-            status_code=500,
-            content={
-                "data": {},
-                "error": f"Could not retrieve configuration: {str(e)}",
-            },
-        )
-
-
-@http_guarded_router.get("/api/document-types")
-async def get_document_types():
-    try:
-        doc_types = manager.retrieve_all_document_types()
-        return JSONResponse(
-            content={
-                "doc_types": list(doc_types)
-            }
-        )
-    except Exception as e:
-        msg.fail(f"All document types retrieval failed: {str(e)}")
-        return JSONResponse(
-            content={
-                "doc_types": [],
-            }
-        )
-
-
+# Retrieve all documents
 @http_guarded_router.get("/api/documents")
 async def get_all_documents():
     try:
@@ -208,111 +127,64 @@ async def get_all_documents():
         )
 
 
-### WEBSOCKETS
-
-@ws_router.websocket("/ws/generate_stream")
-async def websocket_generate_stream(websocket: WebSocket):
-    await websocket.accept()
-    header_key = websocket.headers.get("X-API-Key", "")
-    api_key = os.environ.get("X_API_KEY", "")
-
-    if api_key != "" and header_key != api_key:
-        msg.fail("WebSocket Error: Invalid API Key")
-        await websocket.send_json({"detail": "Invalid API Key"})
-        await websocket.close()
-    else:
-        while True:  # Start a loop to keep the connection alive.
-            try:
-                data = await websocket.receive_text()
-                # Parse and validate the JSON string using Pydantic model
-                msg.info(data)
-                payload = GeneratePayload.model_validate_json(data)
-                msg.good(f"Received generate stream call for {payload.query}")
-                full_text = ""
-                async for chunk in manager.generate_stream_answer(
-                        [payload.query], [payload.context], payload.conversation
-                ):
-                    full_text += chunk["message"]
-                    if chunk["finish_reason"] == "stop":
-                        chunk["full_text"] = full_text
-                    await websocket.send_json(chunk)
-
-            except WebSocketDisconnect:
-                msg.warn("WebSocket connection closed by client.")
-                break  # Break out of the loop when the client disconnects
-
-            except Exception as e:
-                msg.fail(f"WebSocket Error: {str(e)}")
-                await websocket.send_json(
-                    {"message": e, "finish_reason": "stop", "full_text": str(e)}
-                )
-            msg.good("Succesfully streamed answer")
-
-
-### POST
-
-# Reset Verba
-@http_guarded_router.post("/api/reset", include_in_schema=False)
-async def reset_verba(payload: ResetPayload):
-    if production:
-        return JSONResponse(status_code=200, content={})
+# Retrieve specific document based on UUID
+@http_guarded_router.get("/api/document")
+async def get_document(payload: GetDocumentPayload):
+    msg.info(f"Document ID received: {payload.document_id}")
 
     try:
-        if payload.resetMode == "VERBA":
-            manager.reset()
-        elif payload.resetMode == "DOCUMENTS":
-            manager.reset_documents()
-        elif payload.resetMode == "CACHE":
-            manager.reset_cache()
-        elif payload.resetMode == "SUGGESTIONS":
-            manager.reset_suggestion()
-        elif payload.resetMode == "CONFIG":
-            manager.reset_config()
+        document = manager.retrieve_document(payload.document_id)
+        document_properties = document.get("properties", {})
+        document_obj = {
+            "class": document.get("class", "No Class"),
+            "id": document.get("id", payload.document_id),
+            "chunks": document_properties.get("chunk_count", 0),
+            "link": document_properties.get("doc_link", ""),
+            "name": document_properties.get("doc_name", "No name"),
+            "type": document_properties.get("doc_type", "No type"),
+            "text": document_properties.get("text", "No text"),
+            "timestamp": document_properties.get("timestamp", ""),
+        }
 
-        msg.info(f"Resetting Verba ({payload.resetMode})")
-
-    except Exception as e:
-        msg.warn(f"Failed to reset Verba {str(e)}")
-
-    return JSONResponse(status_code=200, content={})
-
-
-# Receive query and return chunks and query answer
-@http_guarded_router.post("/api/import", include_in_schema=False)
-async def import_data(payload: ImportPayload):
-    logging = []
-
-    if production:
-        logging.append(
-            {"type": "ERROR", "message": "Can't import when in production mode"}
-        )
+        msg.good(f"Succesfully retrieved document: {payload.document_id}")
         return JSONResponse(
             content={
-                "logging": logging,
+                "error": "",
+                "document": document_obj,
+            }
+        )
+    except Exception as e:
+        msg.fail(f"Document retrieval failed: {str(e)}")
+        return JSONResponse(
+            content={
+                "error": str(e),
+                "document": None,
             }
         )
 
+
+# Retrieve auto complete suggestions based on user input
+@http_guarded_router.get("/api/suggestions", include_in_schema=False)
+async def suggestions(payload: QueryPayload):
     try:
-        set_config(manager, payload.config)
-        documents, logging = manager.import_data(
-            payload.data, payload.textValues, logging
-        )
+        suggestions = manager.get_suggestions(payload.query)
 
         return JSONResponse(
             content={
-                "logging": logging,
+                "suggestions": suggestions,
             }
         )
-
-    except Exception as e:
-        logging.append({"type": "ERROR", "message": str(e)})
+    except Exception:
         return JSONResponse(
             content={
-                "logging": logging,
+                "suggestions": [],
             }
         )
 
 
+# POST
+
+# Import documents
 @http_guarded_router.post("/api/import-files")
 async def import_files(payload: ImportPayload):
     response = []
@@ -352,29 +224,6 @@ async def import_files(payload: ImportPayload):
                 "documents": response,
             }
         )
-
-
-@http_guarded_router.post("/api/set_config", include_in_schema=False)
-async def update_config(payload: ConfigPayload):
-    if production:
-        return JSONResponse(
-            content={
-                "status": "200",
-                "status_msg": "Config can't be updated in Production Mode",
-            }
-        )
-
-    try:
-        set_config(manager, payload.config)
-    except Exception as e:
-        msg.warn(f"Failed to set new Config {str(e)}")
-
-    return JSONResponse(
-        content={
-            "status": "200",
-            "status_msg": "Config Updated",
-        }
-    )
 
 
 # Receive query and return chunks and query answer
@@ -431,139 +280,12 @@ async def query(payload: QueryPayload):
         )
 
 
-# Retrieve auto complete suggestions based on user input
-@http_guarded_router.post("/api/suggestions", include_in_schema=False)
-async def suggestions(payload: QueryPayload):
-    try:
-        suggestions = manager.get_suggestions(payload.query)
-
-        return JSONResponse(
-            content={
-                "suggestions": suggestions,
-            }
-        )
-    except Exception:
-        return JSONResponse(
-            content={
-                "suggestions": [],
-            }
-        )
-
-
-# Retrieve specific document based on UUID
-@http_guarded_router.get("/api/document")
-async def get_document(payload: GetDocumentPayload):
-    # TODO Standarize Document Creation
-    msg.info(f"Document ID received: {payload.document_id}")
-
-    try:
-        document = manager.retrieve_document(payload.document_id)
-        document_properties = document.get("properties", {})
-        document_obj = {
-            "class": document.get("class", "No Class"),
-            "id": document.get("id", payload.document_id),
-            "chunks": document_properties.get("chunk_count", 0),
-            "link": document_properties.get("doc_link", ""),
-            "name": document_properties.get("doc_name", "No name"),
-            "type": document_properties.get("doc_type", "No type"),
-            "text": document_properties.get("text", "No text"),
-            "timestamp": document_properties.get("timestamp", ""),
-        }
-
-        msg.good(f"Succesfully retrieved document: {payload.document_id}")
-        return JSONResponse(
-            content={
-                "error": "",
-                "document": document_obj,
-            }
-        )
-    except Exception as e:
-        msg.fail(f"Document retrieval failed: {str(e)}")
-        return JSONResponse(
-            content={
-                "error": str(e),
-                "document": None,
-            }
-        )
-
-
-## Retrieve and search documents imported to Weaviate
-@http_guarded_router.post("/api/get_all_documents", include_in_schema=False)
-async def get_all_documents(payload: SearchQueryPayload):
-    # TODO Standarize Document Creation
-    msg.info("Get all documents request received")
-    start_time = time.time()  # Start timing
-
-    try:
-        if payload.query == "":
-            documents = manager.retrieve_all_documents(
-                payload.doc_type, payload.page, payload.pageSize
-            )
-        else:
-            documents = manager.search_documents(
-                payload.query, payload.doc_type, payload.page, payload.pageSize
-            )
-
-        if not documents:
-            return JSONResponse(
-                content={
-                    "documents": [],
-                    "doc_types": [],
-                    "current_embedder": manager.embedder_manager.selected_embedder,
-                    "error": f"No Results found!",
-                    "took": 0,
-                }
-            )
-
-        documents_obj = []
-        for document in documents:
-            _additional = document["_additional"]
-
-            documents_obj.append(
-                {
-                    "class": "No Class",
-                    "uuid": _additional.get("id", "none"),
-                    "chunks": document.get("chunk_count", 0),
-                    "link": document.get("doc_link", ""),
-                    "name": document.get("doc_name", "No name"),
-                    "type": document.get("doc_type", "No type"),
-                    "text": document.get("text", "No text"),
-                    "timestamp": document.get("timestamp", ""),
-                }
-            )
-
-        elapsed_time = round(time.time() - start_time, 2)  # Calculate elapsed time
-        msg.good(
-            f"Succesfully retrieved document: {len(documents)} documents in {elapsed_time}s"
-        )
-
-        doc_types = manager.retrieve_all_document_types()
-
-        return JSONResponse(
-            content={
-                "documents": documents_obj,
-                "doc_types": list(doc_types),
-                "current_embedder": manager.embedder_manager.selected_embedder,
-                "error": "",
-                "took": elapsed_time,
-            }
-        )
-    except Exception as e:
-        msg.fail(f"All Document retrieval failed: {str(e)}")
-        return JSONResponse(
-            content={
-                "documents": [],
-                "doc_types": [],
-                "current_embedder": manager.embedder_manager.selected_embedder,
-                "error": f"All Document retrieval failed: {str(e)}",
-                "took": 0,
-            }
-        )
+# DELETE
 
 
 # Delete specific document based on UUID
 @http_guarded_router.delete("/api/document")
-async def delete_document(payload: GetDocumentPayload):
+async def delete_document(payload: DeleteDocumentPayload):
     if production:
         msg.warn("Can't delete documents when in Production Mode")
         return JSONResponse(status_code=200, content={})
@@ -574,19 +296,20 @@ async def delete_document(payload: GetDocumentPayload):
     return JSONResponse(content={})
 
 
-# Delete specific document based on UUID
+# Delete specific document based on name
 @http_guarded_router.delete("/api/document-name")
-async def delete_document_by_name(payload: GetDocumentPayload):
+async def delete_document_by_name(payload: DeleteDocumentNamePayload):
     if production:
         msg.warn("Can't delete documents when in Production Mode")
         return JSONResponse(status_code=200, content={})
 
-    msg.info(f"Document Name received: {payload.document_id}")
+    msg.info(f"Document Name received: {payload.document_name}")
 
-    manager.delete_document_by_name(payload.document_id)
+    manager.delete_document_by_name(payload.document_name)
     return JSONResponse(content={})
 
 
+# Delete all documents
 @http_guarded_router.delete("/api/documents")
 async def delete_all_documents():
     if production:
@@ -595,6 +318,47 @@ async def delete_all_documents():
 
     manager.delete_documents()
     return JSONResponse(content={})
+
+
+# WEBSOCKETS
+
+@ws_router.websocket("/ws/generate_stream")
+async def websocket_generate_stream(websocket: WebSocket):
+    await websocket.accept()
+    header_key = websocket.headers.get("X-API-Key", "")
+    api_key = os.environ.get("X_API_KEY", "")
+
+    if api_key != "" and header_key != api_key:
+        msg.fail("WebSocket Error: Invalid API Key")
+        await websocket.send_json({"detail": "Invalid API Key"})
+        await websocket.close()
+    else:
+        while True:  # Start a loop to keep the connection alive.
+            try:
+                data = await websocket.receive_text()
+                # Parse and validate the JSON string using Pydantic model
+                msg.info(data)
+                payload = GeneratePayload.model_validate_json(data)
+                msg.good(f"Received generate stream call for {payload.query}")
+                full_text = ""
+                async for chunk in manager.generate_stream_answer(
+                        [payload.query], [payload.context], payload.conversation
+                ):
+                    full_text += chunk["message"]
+                    if chunk["finish_reason"] == "stop":
+                        chunk["full_text"] = full_text
+                    await websocket.send_json(chunk)
+
+            except WebSocketDisconnect:
+                msg.warn("WebSocket connection closed by client.")
+                break  # Break out of the loop when the client disconnects
+
+            except Exception as e:
+                msg.fail(f"WebSocket Error: {str(e)}")
+                await websocket.send_json(
+                    {"message": e, "finish_reason": "stop", "full_text": str(e)}
+                )
+            msg.good("Succesfully streamed answer")
 
 
 app.include_router(http_guarded_router)

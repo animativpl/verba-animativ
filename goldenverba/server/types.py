@@ -49,7 +49,7 @@ class LoadPayload(BaseModel):
 
 class ImportPayload(BaseModel):
     data: list[FileData]
-    textValues: list[str]
+    textValues: Optional[list[str]] = None
     config: Optional[dict] = None
 
 
@@ -64,3 +64,11 @@ class GetComponentPayload(BaseModel):
 class SetComponentPayload(BaseModel):
     component: str
     selected_component: str
+
+
+class DeleteDocumentPayload(BaseModel):
+    document_id: str
+
+
+class DeleteDocumentNamePayload(BaseModel):
+    document_name: str
