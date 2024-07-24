@@ -673,15 +673,18 @@ class VerbaManager:
             }
 
         else:
-            full_text = await self.generator_manager.generators[
+            full_text = ""
+            async for chunk in self.generator_manager.generators[
                 self.generator_manager.selected_generator
-            ].generate(queries, contexts, conversation)
+            ].generate_stream(queries, contexts, conversation):
+                full_text += chunk["message"]
+
             if self.enable_caching:
                 self.embedder_manager.embedders[
                     self.embedder_manager.selected_embedder
                 ].add_to_semantic_cache(self.client, semantic_query, full_text)
                 self.set_suggestions(" ".join(queries))
-            return full_text
+            return {"message": full_text, "finish_reason": "stop"}
 
     async def generate_stream_answer(
             self, queries: list[str], contexts: list[str], conversation: dict

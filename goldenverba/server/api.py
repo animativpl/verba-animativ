@@ -280,6 +280,27 @@ async def query(payload: QueryPayload):
         )
 
 
+@http_guarded_router.post('/api/generate-answer')
+async def generate_answer(payload: GeneratePayload):
+    msg.good(f"Received generate answer: {payload.query}")
+    start_time = time.time()
+    try:
+        answer = await manager.generate_answer([payload.query], [payload.context], payload.conversation)
+
+        elapsed_time = round(time.time() - start_time, 2)
+        msg.good(f"Succesfully generaetd answer: {payload.query} in {elapsed_time}s")
+
+        return JSONResponse(content=answer)
+    except Exception as e:
+        msg.warn(f"Generate answer failed: {str(e)}")
+        return JSONResponse(
+            content={
+                "message": e,
+                "finish_reason": "stop",
+            }
+        )
+
+
 # DELETE
 
 
