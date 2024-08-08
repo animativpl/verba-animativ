@@ -18,7 +18,8 @@ class WindowRetriever(Retriever):
 
     def retrieve(
         self,
-        queries: list[QueryPayload],
+        queries: list[str],
+        documents_ids: list[list[str]],
         client: Client,
         embedder: Embedder,
     ) -> list[Chunk]:
@@ -32,7 +33,7 @@ class WindowRetriever(Retriever):
         needs_vectorization = embedder.get_need_vectorization()
         chunks = []
 
-        for query in queries:
+        for query, ids in zip(queries, documents_ids):
             query_results = (
                 client.query.get(
                     class_name=chunk_class,
@@ -45,18 +46,18 @@ class WindowRetriever(Retriever):
                     ],
                 )
                 .with_where({
-                    "path": ["doc_type"],
-                    "operator": "Equal",
-                    "valueText": query.doc_label,
+                    "path": ["doc_uuid"],
+                    "operator": "ContainsAny",
+                    "valueTextArray": ids,
                 })
                 .with_additional(properties=["score"])
-                .with_autocut(1)
+                .with_autocut(3)
             )
 
             if needs_vectorization:
-                vector = embedder.vectorize_query(query.query)
+                vector = embedder.vectorize_query(query)
                 query_results = query_results.with_hybrid(
-                    query=query.query,
+                    query=query,
                     vector=vector,
                     fusion_type=HybridFusion.RELATIVE_SCORE,
                     properties=[
@@ -66,7 +67,7 @@ class WindowRetriever(Retriever):
 
             else:
                 query_results = query_results.with_hybrid(
-                    query=query.query,
+                    query=query,
                     fusion_type=HybridFusion.RELATIVE_SCORE,
                     properties=[
                         "text",

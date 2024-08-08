@@ -231,7 +231,8 @@ class RetrieverManager:
 
     def retrieve(
         self,
-        queries: list[QueryPayload],
+        queries: list[str],
+        document_ids: list[list[str]],
         client: Client,
         embedder: Embedder,
         generator: Generator,
@@ -243,7 +244,7 @@ class RetrieverManager:
         @returns list[Chunk] - List of retrieved chunks.
         """
         chunks, context = self.retrievers[self.selected_retriever].retrieve(
-            queries, client, embedder
+            queries, document_ids, client, embedder
         )
         managed_context = self.retrievers[self.selected_retriever].cutoff_text(
             context, generator.context_window

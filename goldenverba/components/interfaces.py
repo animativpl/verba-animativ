@@ -1,5 +1,7 @@
 from typing import List
 
+from weaviate.gql.get import GetBuilder
+
 from goldenverba.components.document import Document
 from goldenverba.components.chunk import Chunk
 from goldenverba.components.types import InputText, FileData, InputNumber
@@ -574,7 +576,8 @@ class Retriever(VerbaComponent):
 
     def retrieve(
         self,
-        queries: list[QueryPayload],
+        query: list[str],
+        documents_ids: list[list[str]],
         client: Client,
         embedder: Embedder,
     ) -> tuple[list[Chunk], str]:
@@ -585,6 +588,28 @@ class Retriever(VerbaComponent):
         @returns tuple(list[Chunk],str) - List of retrieved chunks and the context string.
         """
         raise NotImplementedError("load method must be implemented by a subclass.")
+
+    def documents_with_labels(self, query: QueryPayload, client: Client, embedder: Embedder) -> GetBuilder:
+        chunk_class = embedder.get_chunk_class()
+        query_results = (
+            client.query.get(
+                class_name=chunk_class,
+                properties=[
+                    "text",
+                    "doc_name",
+                    "chunk_id",
+                    "doc_uuid",
+                    "doc_type",
+                ],
+            )
+            .with_where({
+                "path": ["doc_type"],
+                "operator": "Equal",
+                "valueText": query.doc_label,
+            })
+            .with_additional(properties=["score"])
+            # .with_autocut(1)
+        )
     
     def cutoff_text(self, text: str, content_length: int) -> str:
         encoding = tiktoken.encoding_for_model("gpt-3.5-turbo")

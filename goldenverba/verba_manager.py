@@ -3,6 +3,7 @@ import ssl
 
 import weaviate
 from dotenv import load_dotenv, find_dotenv
+from paho.mqtt import client as mqtt
 from wasabi import msg
 from weaviate.embedded import EmbeddedOptions
 
@@ -494,8 +495,16 @@ class VerbaManager:
         msg.info("Added query to suggestions")
 
     def retrieve_chunks(self, queries: list[QueryPayload]) -> list[Chunk]:
+        q_documents = [self.retrieve_all_documents_by_wildcard(query.doc_label) for query in queries]
+        documents_ids = [[document['_additional']['id'] for document in q_document] for q_document in q_documents]
+
+        queries_str = [query.query for query in queries]
+
+        assert len(documents_ids) == len(queries_str)
+
         chunks, context = self.retriever_manager.retrieve(
-            queries,
+            queries_str,
+            documents_ids,
             self.client,
             self.embedder_manager.embedders[self.embedder_manager.selected_embedder],
             self.generator_manager.generators[
@@ -607,6 +616,15 @@ class VerbaManager:
 
         results = query_results["data"]["Get"][class_name]
         return results
+
+    def retrieve_all_documents_by_wildcard(self, wildcard: str) -> list:
+        documents = self.retrieve_all_documents()
+        return list(
+            filter(
+                lambda document: mqtt.topic_matches_sub(wildcard, document['doc_type']),
+                documents,
+            )
+        )
 
     def retrieve_all_document_types(self) -> list:
         """Aggreagtes and returns all document types from Weaviate
