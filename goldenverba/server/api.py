@@ -182,6 +182,24 @@ async def suggestions(payload: QueryPayload):
         )
 
 
+@http_guarded_router.get("/api/document-types")
+async def get_document_types():
+    try:
+        doc_types = manager.retrieve_all_document_types()
+        return JSONResponse(
+            content={
+                "doc_types": list(doc_types)
+            }
+        )
+    except Exception as e:
+        msg.fail(f"All document types retrieval failed: {str(e)}")
+        return JSONResponse(
+            content={
+                "doc_types": [],
+            }
+        )
+
+
 # POST
 
 # Import documents
