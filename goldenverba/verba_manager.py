@@ -626,29 +626,11 @@ class VerbaManager:
             )
         )
 
-    def retrieve_all_document_types(self) -> list:
+    def retrieve_all_document_types(self) -> set:
         """Aggreagtes and returns all document types from Weaviate
         @returns list - Document list.
         """
-        class_name = "VERBA_Document_" + schema_manager.strip_non_letters(
-            self.embedder_manager.embedders[
-                self.embedder_manager.selected_embedder
-            ].vectorizer
-        )
-
-        query_results = (
-            self.client.query.aggregate(class_name)
-            .with_fields("doc_type {count topOccurrences {value occurs}}")
-            .do()
-        )
-
-        results = [
-            doc_type["value"]
-            for doc_type in query_results["data"]["Aggregate"][class_name][0][
-                "doc_type"
-            ]["topOccurrences"]
-        ]
-        return results
+        return set([doc["doc_type"] for doc in self.retrieve_all_documents()])
 
     def retrieve_document(self, doc_id: str) -> dict:
         """Return a document by it's ID (UUID format) from Weaviate
