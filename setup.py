@@ -35,6 +35,7 @@ setup(
         "tiktoken==0.6.0",
         "requests==2.31.0",
         "pypdf==4.2.0",
+        "paho-mqtt==2.1.0"
     ],
     extras_require={
         "dev": ["pytest", "wheel", "twine", "black>=23.7.0", "setuptools"],
