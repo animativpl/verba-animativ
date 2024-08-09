@@ -379,13 +379,24 @@ async def websocket_generate_stream(websocket: WebSocket):
                 msg.info(data)
                 payload = GeneratePayload.model_validate_json(data)
                 msg.good(f"Received generate stream call for {payload.query}")
+
                 full_text = ""
+                combined_log_probs = 0.
+                n_combined = 0
+
                 async for chunk in manager.generate_stream_answer(
                         [payload.query], [payload.context], payload.conversation
                 ):
                     full_text += chunk["message"]
+
                     if chunk["finish_reason"] == "stop":
                         chunk["full_text"] = full_text
+                        chunk["avg_logprob"] = combined_log_probs / n_combined
+                    else:
+                        for log_prob in chunk["logprobs"]:
+                            n_combined += 1
+                            combined_log_probs += log_prob
+
                     await websocket.send_json(chunk)
 
             except WebSocketDisconnect:

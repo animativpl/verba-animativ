@@ -1,4 +1,6 @@
 import os
+
+import numpy as np
 from dotenv import load_dotenv
 from goldenverba.components.interfaces import Generator
 
@@ -64,6 +66,8 @@ class GPT4Generator(Generator):
                 "messages": messages,
                 "stream": True,
                 "temperature": 0.0,
+                "logprobs": True,
+                "top_logprobs": 0,
             }
             if openai.api_type == "azure":
                 chat_completion_arguments["deployment_id"] = self.model_name
@@ -80,6 +84,10 @@ class GPT4Generator(Generator):
                             yield {
                                 "message": chunk["choices"][0]["delta"]["content"],
                                 "finish_reason": chunk["choices"][0]["finish_reason"],
+                                "logprobs": [
+                                    np.exp(log_prob["logprob"])
+                                    for log_prob in chunk["choices"][0]["logprobs"]["content"]
+                                ]
                             }
                         else:
                             yield {
